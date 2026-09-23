@@ -24,10 +24,53 @@ const sendError = (res, error) => {
   });
 };
 
-// Email OTP Sender Helper using Resend API (HTTP-based, works 100% on Render free tier)
+// Email OTP Sender Helper using Brevo API (HTTP-based, sends to ANY recipient for free)
 const sendEmailOTP = async (email, otpCode) => {
+  const brevoApiKey = process.env.BREVO_API_KEY;
   const resendApiKey = process.env.RESEND_API_KEY;
-  
+
+  const htmlTemplate = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 30px; background: #0f172a; color: #f8fafc; border-radius: 12px; max-width: 500px; margin: 20px auto;">
+      <h1 style="color: #22c55e; margin: 0 0 10px 0; font-size: 24px;">🏓 DinkSync Pickleball</h1>
+      <p style="color: #94a3b8; font-size: 15px; margin-bottom: 24px;">Your 6-digit verification code is below:</p>
+      <div style="background: rgba(34, 197, 94, 0.12); border: 1.5px solid rgba(34, 197, 94, 0.4); border-radius: 10px; padding: 18px 24px; margin: 0 auto 24px auto; display: inline-block;">
+        <span style="color: #22c55e; font-size: 36px; font-weight: 800; letter-spacing: 8px;">${otpCode}</span>
+      </div>
+      <p style="color: #64748b; font-size: 13px; margin: 0;">This code is valid for 5 minutes. Do not share it with anyone.</p>
+    </div>
+  `;
+
+  // 1. First priority: Brevo API (sends to ANY email address without domain restrictions)
+  if (brevoApiKey) {
+    try {
+      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': brevoApiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          sender: { name: 'DinkSync Pickleball', email: process.env.FROM_EMAIL || 'exai7897@gmail.com' },
+          to: [{ email }],
+          subject: 'Your Pickleball Verification Code',
+          htmlContent: htmlTemplate,
+        }),
+      });
+
+      const resData = await response.json();
+      if (response.ok) {
+        console.log(`[BREVO OTP SUCCESS] Delivered to ${email}. ID: ${resData.messageId}`);
+        return;
+      } else {
+        console.error('[BREVO OTP ERROR]', resData);
+      }
+    } catch (err) {
+      console.error('[BREVO API NETWORK ERROR]', err.message);
+    }
+  }
+
+  // 2. Second priority: Resend API
   if (resendApiKey) {
     try {
       const response = await fetch('https://api.resend.com/emails', {
@@ -40,16 +83,7 @@ const sendEmailOTP = async (email, otpCode) => {
           from: 'DinkSync Pickleball <onboarding@resend.dev>',
           to: [email],
           subject: 'Your Pickleball Verification Code',
-          html: `
-            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 30px; background: #0f172a; color: #f8fafc; border-radius: 12px; max-width: 500px; margin: 20px auto;">
-              <h1 style="color: #22c55e; margin: 0 0 10px 0; font-size: 24px;">🏓 DinkSync Pickleball</h1>
-              <p style="color: #94a3b8; font-size: 15px; margin-bottom: 24px;">Your 6-digit verification code is below:</p>
-              <div style="background: rgba(34, 197, 94, 0.12); border: 1.5px solid rgba(34, 197, 94, 0.4); border-radius: 10px; padding: 18px 24px; margin: 0 auto 24px auto; display: inline-block;">
-                <span style="color: #22c55e; font-size: 36px; font-weight: 800; letter-spacing: 8px;">${otpCode}</span>
-              </div>
-              <p style="color: #64748b; font-size: 13px; margin: 0;">This code is valid for 5 minutes. Do not share it with anyone.</p>
-            </div>
-          `,
+          html: htmlTemplate,
         }),
       });
 
