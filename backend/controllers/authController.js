@@ -24,8 +24,48 @@ const sendError = (res, error) => {
   });
 };
 
-// Email OTP Sender Helper using Nodemailer
+// Email OTP Sender Helper using Resend API (HTTP-based, works 100% on Render free tier)
 const sendEmailOTP = async (email, otpCode) => {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  
+  if (resendApiKey) {
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'DinkSync Pickleball <onboarding@resend.dev>',
+          to: [email],
+          subject: 'Your Pickleball Verification Code',
+          html: `
+            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 30px; background: #0f172a; color: #f8fafc; border-radius: 12px; max-width: 500px; margin: 20px auto;">
+              <h1 style="color: #22c55e; margin: 0 0 10px 0; font-size: 24px;">🏓 DinkSync Pickleball</h1>
+              <p style="color: #94a3b8; font-size: 15px; margin-bottom: 24px;">Your 6-digit verification code is below:</p>
+              <div style="background: rgba(34, 197, 94, 0.12); border: 1.5px solid rgba(34, 197, 94, 0.4); border-radius: 10px; padding: 18px 24px; margin: 0 auto 24px auto; display: inline-block;">
+                <span style="color: #22c55e; font-size: 36px; font-weight: 800; letter-spacing: 8px;">${otpCode}</span>
+              </div>
+              <p style="color: #64748b; font-size: 13px; margin: 0;">This code is valid for 5 minutes. Do not share it with anyone.</p>
+            </div>
+          `,
+        }),
+      });
+
+      const resData = await response.json();
+      if (response.ok) {
+        console.log(`[RESEND OTP SUCCESS] Delivered to ${email}. ID: ${resData.id}`);
+        return;
+      } else {
+        console.error('[RESEND OTP ERROR]', resData);
+      }
+    } catch (err) {
+      console.error('[RESEND API NETWORK ERROR]', err.message);
+    }
+  }
+
+  // Fallback to Nodemailer if SMTP credentials are provided and port is open
   try {
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -40,27 +80,15 @@ const sendEmailOTP = async (email, otpCode) => {
       socketTimeout: 4000,
     });
 
-    const mailOptions = {
+    await transporter.sendMail({
       from: `Pickleball App <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
       to: email,
       subject: 'Your Verification OTP Code',
-      html: `
-        <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
-          <h2>Your Verification Code</h2>
-          <p>Please use the following 6-digit code to verify your account or login:</p>
-          <h1 style="color: #4CAF50; letter-spacing: 5px;">${otpCode}</h1>
-          <p>This code is valid for 5 minutes.</p>
-        </div>
-      `,
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`[EMAIL OTP] Sent to ${email} successfully. Message ID: ${info.messageId}`);
+      text: `Your OTP is: ${otpCode}. Valid for 5 minutes.`,
+    });
+    console.log(`[NODEMAILER OTP] Sent to ${email}`);
   } catch (error) {
-    console.error(`[EMAIL OTP ERROR] Failed to send email to ${email}. (Note: Render free tier blocks outbound SMTP ports 587/465):`, error.message);
-    console.log('==========================================');
-    console.log(`[SIMULATION FALLBACK] EMAIL OTP: OTP code is [${otpCode}] meant for [${email}]`);
-    console.log('==========================================');
+    console.error(`[SMTP ERROR] Failed to send email to ${email}:`, error.message);
   }
 };
 
@@ -112,7 +140,6 @@ export const sendOtpEmail = async (req, res) => {
     res.status(200).json({
       message: 'OTP sent successfully to email',
       email,
-      otpCode,
     });
   } catch (error) {
     sendError(res, error);
@@ -238,7 +265,6 @@ export const loginUser = async (req, res) => {
         message: 'OTP sent for login verification',
         email,
         requiresOtpVerify: true,
-        otpCode,
       });
     }
 
@@ -266,7 +292,6 @@ export const loginUser = async (req, res) => {
         message: 'Mandatory 2FA OTP sent to Admin email',
         requires2fa: true,
         email: user.email,
-        otpCode,
       });
     }
 
@@ -369,7 +394,6 @@ export const forgotPasswordRequest = async (req, res) => {
     res.json({
       message: 'Password reset OTP sent successfully',
       email,
-      otpCode,
     });
   } catch (error) {
     sendError(res, error);

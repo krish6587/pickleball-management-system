@@ -280,12 +280,6 @@ const Login = () => {
             {otpSent && (
               <div className="input-group" style={{ marginBottom: '1.5rem' }}>
                 <label className="input-label">6-Digit Login OTP</label>
-                {simulatedOtp && (
-                  <div style={{ background: 'rgba(0, 255, 128, 0.12)', border: '1px solid rgba(0, 255, 128, 0.35)', borderRadius: '8px', padding: '10px 14px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.85rem' }}>🔑 Your OTP: <strong style={{ color: 'var(--color-primary, #00ff80)', letterSpacing: '2px', fontSize: '1.05rem' }}>{simulatedOtp}</strong></span>
-                    <button type="button" onClick={() => setOtpCode(simulatedOtp)} style={{ background: 'var(--color-primary, #00ff80)', color: '#000', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600 }}>Autofill</button>
-                  </div>
-                )}
                 <input
                   type="text"
                   required
