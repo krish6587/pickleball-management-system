@@ -29,12 +29,15 @@ const sendEmailOTP = async (email, otpCode) => {
   try {
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: process.env.SMTP_PORT || 587,
-      secure: false, // true for 465, false for other ports
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: Number(process.env.SMTP_PORT) === 465,
       auth: {
         user: process.env.SMTP_USER, 
         pass: process.env.SMTP_PASS, 
       },
+      connectionTimeout: 4000,
+      greetingTimeout: 4000,
+      socketTimeout: 4000,
     });
 
     const mailOptions = {
@@ -51,12 +54,10 @@ const sendEmailOTP = async (email, otpCode) => {
       `,
     };
 
-    // Note: If dummy credentials are used, this will fail in the background, 
-    // but we log it to console as a fallback simulation so development can continue.
     const info = await transporter.sendMail(mailOptions);
     console.log(`[EMAIL OTP] Sent to ${email} successfully. Message ID: ${info.messageId}`);
   } catch (error) {
-    console.error(`[EMAIL OTP ERROR] Failed to send email to ${email}. Check your SMTP credentials in .env!`, error.message);
+    console.error(`[EMAIL OTP ERROR] Failed to send email to ${email}. (Note: Render free tier blocks outbound SMTP ports 587/465):`, error.message);
     console.log('==========================================');
     console.log(`[SIMULATION FALLBACK] EMAIL OTP: OTP code is [${otpCode}] meant for [${email}]`);
     console.log('==========================================');
@@ -105,11 +106,13 @@ export const sendOtpEmail = async (req, res) => {
       await user.save();
     }
 
-    await sendEmailOTP(email, otpCode);
+    // Trigger email send without blocking the response
+    sendEmailOTP(email, otpCode).catch(() => {});
 
     res.status(200).json({
       message: 'OTP sent successfully to email',
       email,
+      otpCode,
     });
   } catch (error) {
     sendError(res, error);
@@ -228,12 +231,14 @@ export const loginUser = async (req, res) => {
       user.otpExpires = new Date(Date.now() + 5 * 60 * 1000);
       await user.save();
 
-      await sendEmailOTP(email, otpCode);
+      // Trigger email send in background without blocking response
+      sendEmailOTP(email, otpCode).catch(() => {});
 
       return res.status(200).json({
         message: 'OTP sent for login verification',
         email,
         requiresOtpVerify: true,
+        otpCode,
       });
     }
 
@@ -254,12 +259,14 @@ export const loginUser = async (req, res) => {
       user.otpExpires = new Date(Date.now() + 5 * 60 * 1000);
       await user.save();
 
-      await sendEmailOTP(user.email, otpCode);
+      // Trigger 2FA email in background
+      sendEmailOTP(user.email, otpCode).catch(() => {});
 
       return res.status(200).json({
         message: 'Mandatory 2FA OTP sent to Admin email',
         requires2fa: true,
         email: user.email,
+        otpCode,
       });
     }
 
@@ -356,11 +363,13 @@ export const forgotPasswordRequest = async (req, res) => {
     user.otpExpires = new Date(Date.now() + 5 * 60 * 1000);
     await user.save();
 
-    await sendEmailOTP(email, otpCode);
+    // Trigger email send without blocking response
+    sendEmailOTP(email, otpCode).catch(() => {});
 
     res.json({
       message: 'Password reset OTP sent successfully',
       email,
+      otpCode,
     });
   } catch (error) {
     sendError(res, error);

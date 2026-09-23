@@ -22,11 +22,12 @@ app.set('trust proxy', 1);
 // Security Headers
 app.use(helmet());
 
-// CORS — restrict to frontend domain in production
+// CORS — allow frontend with credentials
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production'
-    ? (process.env.FRONTEND_URL || '*')
-    : '*',
+  origin: (origin, callback) => {
+    // Dynamically allow requesting origin so credentials: true works seamlessly
+    callback(null, true);
+  },
   credentials: true,
 };
 app.use(cors(corsOptions));

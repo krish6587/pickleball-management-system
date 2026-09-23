@@ -6,7 +6,7 @@ import { Trophy, ShieldCheck, Mail, Loader2, ArrowLeft } from 'lucide-react';
 const Verify = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { verifyOtp } = useAuth();
+  const { verifyOtp, API_URL } = useAuth();
 
   const [email, setEmail] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
@@ -118,7 +118,7 @@ const Verify = () => {
               <div style={styles.simulationItem}>
                 <span>Email Verification: </span>
                 <a
-                  href={`http://localhost:5000/api/auth/verify-email?token=${simulatedEmailToken}`}
+                  href={`${API_URL}/auth/verify-email?token=${simulatedEmailToken}`}
                   target="_blank"
                   rel="noreferrer"
                   style={styles.verifyLink}
